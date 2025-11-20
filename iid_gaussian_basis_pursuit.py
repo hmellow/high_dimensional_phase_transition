@@ -21,6 +21,7 @@ import math
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from joblib import Parallel, delayed
 
 
 def generate_signal(p, sparsity_level):
@@ -68,7 +69,7 @@ def run_basis_pursuit(p, n, sparsity_level):
         return False
 
 
-def plot_scatter_results(delta_vals, s_vals, results):
+def plot_scatter_results(p, delta_vals, s_vals, results):
     delta_grid, s_grid = np.meshgrid(delta_vals, s_vals, indexing="ij")
     colors = np.where(results, "blue", "red")
 
@@ -80,16 +81,16 @@ def plot_scatter_results(delta_vals, s_vals, results):
     plt.scatter(delta_flat, s_flat, c=colors_flat)
     plt.xlabel("$\\delta=\\frac{n}{p}$ (oversampling ratio)")
     plt.ylabel("s (sparsity)")
-    plt.title("Basis Pursuit Phase Transition ($A$ i.i.d Gaussian)")
+    plt.title(f"Basis Pursuit Phase Transition ($A$ i.i.d Gaussian), $p={p}$")
     success_patch = mpatches.Patch(color="blue", label="Success")
     failure_patch = mpatches.Patch(color="red", label="Failure")
-    plt.legend(handles=[success_patch, failure_patch], loc="best")
+    plt.legend(handles=[success_patch, failure_patch], loc="lower left")
     plt.show()
 
 
 def main():
     p = 1000
-    num_data_points = 1000
+    num_data_points = 500
 
     num_1d = math.floor(np.sqrt(num_data_points))
     delta_vals = np.linspace(0.01, 0.99, num_1d)
@@ -105,8 +106,33 @@ def main():
             p_bar.update(1)
             p_bar.refresh()
 
-    plot_scatter_results(delta_vals, s_vals, results)
+    plot_scatter_results(p, delta_vals, s_vals, results)
+
+
+def main_parallel():
+    p = 500
+    num_data_points = 5000
+
+    num_1d = math.floor(np.sqrt(num_data_points))
+    delta_vals = np.linspace(0.01, 0.99, num_1d)
+    s_vals = np.linspace(0.01, 0.99, num_1d)
+
+    tasks = [(delta, s) for delta in delta_vals for s in s_vals]
+
+    def run_task(delta_s_pair):
+        delta, s = delta_s_pair
+        n = max(1, math.floor(delta * p))
+        result = run_basis_pursuit(p, n, s)
+        return result
+
+    results_flat = Parallel(n_jobs=-1)(
+        delayed(run_task)(task) for task in tqdm(tasks, desc="Running trials")
+    )
+
+    results = np.array(results_flat).reshape(num_1d, num_1d)
+    plot_scatter_results(p, delta_vals, s_vals, results)
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    main_parallel()
