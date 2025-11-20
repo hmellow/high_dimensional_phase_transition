@@ -45,7 +45,6 @@ RECOVERY_TOLERANCE = 1e-3
 
 
 def run_basis_pursuit(p, n, sparsity_level):
-
     # Create A, x, y
     x_signal = generate_signal(p, sparsity_level)
     A = np.random.randn(n, p)
